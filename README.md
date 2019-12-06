@@ -11,8 +11,11 @@ Réalisé par ***TRAN Trong Hieu & TRAN Le Minh***
 
 * Source de données **StarCraft**:  https://archive.ics.uci.edu/ml/datasets/SkillCraft1+Master+Table+Dataset 
 
+
 ### Notes
 
-* Langage utilisé : R avec des libraries dplyr, ggplot & plotly
+* Le jeu des données est téléchargé sous forme *.csv* et mis dans le même repertoire avec ce projet
+
+* Langage utilisé : R avec des libraries *dplyr, ggplot2 & plotly*
 
 * *Mode interactif disponible en Starcraft_EDA.html*
