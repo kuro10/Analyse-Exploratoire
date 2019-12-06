@@ -9,7 +9,7 @@ Réalisé par TRAN Trong Hieu & TRAN Le Minh
 
 ### Jeu de données UCI Machine Learning 
 
-* Source de données de **StarCraft**:  https://archive.ics.uci.edu/ml/datasets/SkillCraft1+Master+Table+Dataset 
+* Source de données **StarCraft**:  https://archive.ics.uci.edu/ml/datasets/SkillCraft1+Master+Table+Dataset 
 
 ### Notes
 
