@@ -2,7 +2,7 @@
 
 ## Sujet : Découvert du monde StarCraft
 
-Réalisé par TRAN Trong Hieu & TRAN Le Minh
+Réalisé par ***TRAN Trong Hieu & TRAN Le Minh***
 
 5 SDBD - Département GEI - INSA Toulouse
 
