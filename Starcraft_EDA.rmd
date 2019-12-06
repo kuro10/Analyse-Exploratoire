@@ -1,0 +1,262 @@
+---
+title: "Projet EDA : Découverte du monde de Starcraft 2"
+author: "TRAN Trong Hieu & TRAN Le Minh"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: yes
+    number_sections: yes
+    toc_float: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+always_allow_html: yes   
+---
+
+```{r setup, include=FALSE, eval=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r library, echo=FALSE, warning=FALSE, message=FALSE}
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+library(plotly)
+library(plyr)
+library(dplyr)
+library(readr)
+```
+
+# Load Dataset
+```{r read file, echo=TRUE, warning=FALSE}
+path = './'
+df <- read.csv(paste(path,"SkillCraft1_Dataset.csv",sep=''),header=TRUE,sep=',')
+```
+
+
+```{r, echo = FALSE, eval = FALSE}
+# head(as.data.frame(df))
+# dim(df)
+# str(df)
+```
+
+
+```{r pretraitement data, warning = FALSE}
+df$TotalHours = strtoi(df$TotalHours)
+df$HoursPerWeek = as.numeric(as.character(df$HoursPerWeek),na.rm=TRUE)
+df$LeagueIndex = as.factor(df$LeagueIndex)
+df$LeagueIndex = mapvalues(df$LeagueIndex,from = c(1,2,3,4,5,6,7,8), 
+                to=c('Bronze','Silver','Gold','Platinum','Diamond', 'Master', 'Grand Master', 'Professional leagues'))
+levels(df$LeagueIndex) = c('Bronze','Silver','Gold','Platinum','Diamond', 'Master', 'Grand Master', 'Professional leagues')
+# str(df)
+```
+
+# Phase d'exploration du jeu de données
+
+## Distribution des joueurs en fonction des ligues
+
+```{r, echo=TRUE, warning=FALSE}
+games_df = df %>% group_by(LeagueIndex) %>% 
+  summarize(n_players = n()) %>% 
+  mutate(freq = n_players/sum(n_players)*100)
+```
+
+
+```{r, warning=FALSE}
+plot_ly(games_df, labels = ~LeagueIndex, values = ~freq, type = 'pie') %>%
+  layout(title = 'Nb of players in each rank',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+```
+
+Nous avons essayé en premier temps le graphique de distribution des joueurs sous forme "pie chart". Il montre le pourcentage de joueurs dans chaque ligue. 
+
+
+```{r, warning=FALSE}
+plot_ly(games_df, x = ~LeagueIndex, y = ~n_players, type = 'bar', name = 'Number of players',
+        text = ~paste("Number of players: ", n_players, "</br>Cumulative sum: ", cumsum(freq)),
+           marker = list(color = c('rgba(204,204,204,1)','rgba(204,204,204,1)','rgba(204,204,204,1)',
+                                'rgba(204,204,204,1)', 'rgba(204,204,204,1)','rgba(204,204,204,1)',
+                                'rgba(204,204,204,1)','rgba(222,45,38,0.8)')) ) %>% 
+    add_trace(y = ~cumsum(freq), type='scatter',mode='lines+markers' , name = "Cumulative fréquency", yaxis = 'y2') %>%
+    add_annotations(x = ~LeagueIndex,
+                    y = ~cumsum(freq)*8,
+                    text = ~paste(round(cumsum(freq), 2), "%"), showarrow = FALSE, yaxis = 'y2')%>%
+    layout(annotations = list(x=~LeagueIndex, y=~n_players+10, text = ~paste(round(freq, 2), "%"), showarrow = FALSE, textposition = 'best'), title = 'Number of players in each rank ',
+          xaxis = list(title = 'League Rank'),
+          yaxis = list(title = 'Number of players'),
+          yaxis2 = list(title='Mean APM',side='right', overlaying='y'))
+```
+
+Ensuite nous avons redirigé notre approche vers le graphique de type histogramme avec une courbe de centile. Ceci montre mieux la distribution des joueurs dans le système de classment du jeu, aussi la courbe centile peut suggérer le niveau moyen de l'ensemble des joueurs.
+
+## Les joueurs sont-ils capables d'améliorer sa performance en jouant plus fréquemment ?
+
+```{r, echo=TRUE, warning=FALSE}
+hours_df = ddply(df, 'Age', summarise, 
+                 mean_hours = mean(HoursPerWeek, na.rm =TRUE), 
+                 mean_total_hours =  mean(TotalHours, na.rm =TRUE),
+                 mean_APM = mean(APM, na.rm =TRUE))
+hours_df = na.omit(hours_df)
+```
+
+```{r, warning=FALSE}
+plot_ly(hours_df, x = ~mean_APM, y = ~mean_hours, 
+            text = ~paste("Age: ",Age,"</br>APM: ",mean_APM, "</br>mean hours per week:",mean_hours, "</br>total hours : ", mean_total_hours),           
+        size = ~as.numeric(mean_total_hours),
+        type = 'scatter', mode = 'markers', color = ~as.factor(Age), colors = 'Paired',
+        marker = list(opacity = 0.5, sizemode = 'diameter')) %>%
+  layout(title = 'Playing frequency and performance',
+         xaxis = list(showgrid = FALSE, title = 'Average APM'),
+         yaxis = list(showgrid = FALSE, title = "Average hours per week"),
+         showlegend = TRUE)
+```
+
+Dans ce graphique, en effet plus fréquemment qu'on joue, plus d'APM qu'on possède. Les points de ce graphiques correspond à l'âge des joueurs, ce qui suggère en plus que les jeunes joueurs tendent à avoir une meilleure performance et aussi plus de temps à s'entraîner. 
+
+## Quelle est la différence dans le style de jeu entre des différentes ligues ?
+
+```{r, echo=TRUE, warning=FALSE}
+facet_df = df %>% 
+        group_by(LeagueIndex)  %>%
+        summarise(mean_SBH = mean(SelectByHotkeys,na.rm=TRUE),
+                  mean_ATH = mean(AssignToHotkeys,na.rm=TRUE),
+                  mean_UTH = mean(UniqueHotkeys,na.rm=TRUE),
+                  mean_WM  = mean(WorkersMade,na.rm=TRUE),
+                  mean_UUN = mean(UniqueUnitsMade,na.rm=TRUE),
+                  mean_TTE = mean(TotalMapExplored, na.rm=TRUE))
+```
+
+```{r, echo=TRUE, warning=FALSE}
+melt_facet_df = melt(facet_df, id = c("LeagueIndex"))
+```
+
+```{r, warning=FALSE}
+g = ggplot(melt_facet_df,aes(x = LeagueIndex, y= value, fill = LeagueIndex)) +
+  geom_bar(stat = "identity", position = "dodge")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),axis.text.y = element_blank()) + 
+  facet_wrap(~variable,scales='free') + theme()  + coord_flip()
+ggplotly(g)
+```
+
+Ce facet se composent de 6 sous-graphiques, chacun contient la comparaison de chaque indice à travers plusieurs ligues. Ce grqphiaue montre une nette différence de style de jeu de chaque ligue, notamment entre les ligues des joueurs occasionnels et les joueurs élites.
+
+## L'âge a-t-il un impact sur la performance des joueurs ? 
+
+```{r, echo=TRUE, warning=FALSE}
+age_df = df %>% group_by(LeagueIndex,Age) %>% summarise(nb_players=n())
+age_df = age_df[age_df$Age !='?',]
+```
+
+```{r, warning=FALSE}
+p = ggplot(na.omit(age_df),aes(x = Age, y= nb_players, group=1, color = LeagueIndex)) + 
+  ylab("Total number of players")+
+  geom_line() + geom_point() + theme_bw()
+ggplotly(p)
+```
+
+Dans ce graphique, chaque courbe correspond à la variation de nombre de joueurs de chaque ligue en fonction de l'âge. Starcraft 2 a en effet une base de joueurs très large, allant de 16 à 44 ans. On peut trouver aussi que ce jeu est particulièrement attirant pour les jeunes joueurs avant 25 ans, vu la majorité des joueurs qui se trouvent dans cette tranche d'âge-là.
+
+## Comment se manifeste la performance de chaque ligue ?
+
+```{r, echo=TRUE, warning=FALSE}
+hour_rank_df = ddply(df,.(LeagueIndex),summarize,
+                     mean_hours = mean(HoursPerWeek,na.rm=TRUE),
+                     mean_total_hours = mean(TotalHours,na.rm=TRUE),
+                     mean_APM = mean(APM,na.rm=TRUE))
+```
+
+
+```{r, warning=FALSE}
+plot_ly(hour_rank_df, x = ~LeagueIndex, y = ~mean_total_hours, type = 'bar',name='avg total hour') %>%
+    add_trace( y = ~mean_APM, type='scatter',mode='lines+markers',yaxis = 'y2', name = 'avg APM') %>%
+    layout(title = 'Total hours spent vs. APM under league',
+           xaxis = list(title = 'League'),
+           yaxis = list(title = 'Mean total hours'),
+           barmode = 'group',
+           yaxis2 = list(title='Mean APM',side='right', overlaying='y'))
+```
+
+Dans ce graphique nous nous intéressons à l'APM - l'indice crucial qui révèle la performance des joueurs. On a inséré aussi dans ce graphique le temps de jeu moyen de chaque ligue pour donner une idée sur combien de temps il faut jouer en moyen pour atteindre une certaine ligue.
+
+## Comment les joueurs osent-ils utiliser les unités de haute complexité ?
+
+```{r, echo=TRUE, warning=FALSE}
+complex_df = ddply(df, .(LeagueIndex), summarise,
+                   mean_complex_units = mean(ComplexUnitsMade,na.rm=TRUE),
+                   mean_complex_abilities= mean(ComplexAbilitiesUsed, na.rm=TRUE),
+                   total_players = n())
+```
+
+```{r, warning=FALSE}
+plot_ly(complex_df, x = ~mean_complex_units, y = ~mean_complex_abilities, 
+        text = ~paste("Rank : ",LeagueIndex, "</br>Total players in this rank: ",total_players),           
+        size = ~total_players,
+        type = 'scatter', mode = 'markers', color = ~as.factor(LeagueIndex), colors = 'Paired',
+        marker = list(opacity = 0.5, sizemode = 'diameter')) %>%
+  layout(title = 'Complexity under rank',
+         xaxis = list(showgrid = FALSE, title = "Average complex units"),
+         yaxis = list(showgrid = FALSE), title = "Average complex abilities",
+         showlegend = TRUE)
+```
+
+Dans Starcraft 2, il existe des unités de haute complexité qui possède des capacités très compliquées à utiliser. De ce fait pas tout le monde n'ose les créer dans son armée. Ce graphique renseigne donc sur la fréquence d'utilisation des unités et des capacités de haute complexité. Il est vrai que cette fréquence augmente en fonction des ligues, par contre la ligue des professionnels, en raison des stratégies optimales, opte plus pour des unités moins complexe, donc cette fréquence est beaucoup moins par rapport aux autres ligues d'élites. 
+
+## Un grand APM équivaut-il à une utilisation de manière variée des raccourci clavier ? 
+
+```{r, echo=TRUE, warning=FALSE}
+action_df = ddply(df, .(LeagueIndex), summarise,
+                   mean_APM = mean(APM,na.rm=TRUE),
+                   mean_hotkey = mean(UniqueHotkeys, na.rm=TRUE),
+                   total_players = n())
+```
+
+```{r, warning=FALSE}
+plot_ly(action_df, x = ~mean_APM, y = ~mean_hotkey, 
+        text = ~paste("Rank : ",LeagueIndex, "</br>Total players in this rank: ",total_players),           
+        size = ~total_players,
+        type = 'scatter', mode = 'markers', color = ~as.factor(LeagueIndex), colors = 'Paired',
+        marker = list(opacity = 0.5, sizemode = 'diameter')) %>%
+  layout(title = 'Hotkey under rank',
+         xaxis = list(showgrid = FALSE, title = "Average APM"),
+         yaxis = list(showgrid = FALSE), title = "Average hotkey",
+         showlegend = TRUE)
+```
+
+Ce graphique contient l'information sur l'APM moyen de chaque ligue par rapport au nombre moyen de raccourci clavier unique utilisés. Ce graphique paraît assez trivial, car plus de raccourci clavier utilisés, plus d'action qu'on va effectuer chaque minute. De plus on voir aussi une variation de ces deux indices augmentée en fonction des ligues. 
+
+## Comment se distribuent les joueurs en fonction de l'APM ? 
+
+```{r, warning=FALSE}
+apm_df = df
+apm_df$APMInterval = cut(df$APM, breaks = 20, labels = FALSE)
+apm_df = apm_df %>% group_by(APMInterval) %>% 
+  summarize(n_players = n()) %>% 
+  mutate(freq = n_players/sum(n_players)*100)
+plot_ly(apm_df, x=~APMInterval, y=~n_players, type='bar', name = "Nb of players") %>%
+  add_trace(y=~cumsum(freq), type='scatter', mode='lines+markers',yaxis='y2', name = "Cumul freq") %>%
+  layout(annotations = list(x=~APMInterval, y=~n_players+15, text = ~paste(round(freq, 2), "%"), showarrow = FALSE, textposition = 'best', font = list(size = 9)),
+            title = 'Nb of players in each interval ',
+            xaxis = list(showgrid = FALSE, tickvals = seq(1,20) , 
+                         ticktext = levels(unique(cut(df$APM, breaks = 20))), title = 'APM Intervals', tickangle=45),
+            yaxis = list(showgrid = TRUE, title = 'Number of players'),
+            yaxis2 = list(showgrid = TRUE, title='cumsum',side='right', overlaying='y'))
+
+```
+
+Dans ce graphique, nous avons divisé la plage d'APM en 20 tranches égales pour voir où se situe la performance de l'ensemble des joueurs. En effet le graphique se concentre plutôt à gauche, et que le nombre avec un extrêmement haut APM est très peu nombreux, comme prévu.
+
+## L'âge a-t-il un impact sur la performance des joueurs ? - Part II
+
+
+```{r, warning=FALSE}
+mean_apm_df = ddply(df[df$Age !='?',], .(Age), mutate, mean_apm = mean(APM))
+plot_ly(mean_apm_df,x =~Age, y = ~APM, type = "box", color = ~Age) %>%
+  layout(title = 'Impact of age on performance quality',
+         xaxis = list(showgrid = FALSE, title = "Age"),
+         yaxis = list(showgrid = FALSE), title = "Average APM",
+         showlegend = TRUE)
+```
+
+Cette fois-ci, on veut renseigner sur la variation de l'APM des joueurs en fonction de l'âge. Ici nous avons pu observer la variation des valeurs max et médiane de l'APM sur l'ensemble des joueurs d'âge varié, et aussi les points d'anomalies à partir desquels on pourrait tirer des remarques sur la qualités de performances de chaque âge. 
