@@ -18,4 +18,4 @@ Réalisé par ***TRAN Trong Hieu & TRAN Le Minh***
 
 * Langage utilisé : R avec des libraries *dplyr, ggplot2 & plotly*
 
-* *Mode interactif disponible en Starcraft_EDA.html*
+* *Mode interactif disponible en Starcraft_EDA.html, vous le téléchargez puis ouvrez avec votre navigateur Web*
